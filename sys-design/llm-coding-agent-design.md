@@ -37,7 +37,7 @@ The central engineering thesis, stated up front:
 > (context compaction, state management, multi-model routing). A weaker model
 > with a better harness routinely beats a stronger model with a worse one.
 
-The ten highest-leverage design decisions (detailed in §21):
+The thirteen highest-leverage design decisions (detailed in §21):
 
 1. **Edit formats as versioned closed protocols** between prompt and parser,
    tested in lockstep with golden transcripts (D1).
@@ -129,7 +129,9 @@ handle, grounded in what the field has learned.
   reviewable changes to a user's repository with a high success rate on the
   first attempt and high *eventual* success via self-correction.
 - **Be model-agnostic.** Support many LLM providers (OpenAI, Anthropic,
-  OpenRouter, local models) with per-model capability negotiation.
+  OpenRouter, local models via litellm's Ollama/llama.cpp support) with
+  per-model capability negotiation. A dedicated fully-local *privacy mode*
+  (no telemetry, local-only path) is future work (§22.6).
 - **Fit the context budget.** Stay within the model's context window by
   assembling only the most relevant subset of the repository (repo map, files
   in chat, summarized history). Treat context as a budgeted, measured
@@ -229,6 +231,11 @@ handle, grounded in what the field has learned.
 │  URL scraping · image handling · MCP client                        │
 └────────────────────────────────────────────────────────────────────┘
 ```
+
+The **Security layer** (§12) is cross-cutting rather than a horizontal box
+above: permission checks gate every orchestration boundary, and the OS
+sandbox wraps the repository and tool-execution layers as the enforcement
+backstop.
 
 **Component responsibilities at a glance**
 
@@ -644,7 +651,10 @@ run lint; if errors, package them with the surrounding code (marked with
 block characters via TreeContext) and reflect "Fix any errors below". Run
 tests (`--test-cmd`); failures are reflected the same way. Copilot agent
 mode's error-recovery loop and Codex's "run tests until they pass" are the
-same mechanism at different autonomy levels.
+same mechanism at different autonomy levels. Reflected fixes are
+auto-applied for non-test files only; fixes that modify test files are
+flagged for human review before application (test edits can weaken the
+suite, §19.4).
 
 ### 8.3 Bounded reflection (avoiding degenerate loops)
 
@@ -849,7 +859,7 @@ CI-grade sandbox (§12.3).
 
 | Threat | Vector | Mitigation |
 |---|---|---|
-| Secrets exfiltration | Model reads `~/.ssh`, `.env`, config files | Sandbox deny-read rules; secrets hygiene; permission prompts |
+| Secrets exfiltration | Model reads `~/.ssh`, `.env`, config files | Sandbox deny-read rules (§12.3); secrets hygiene (§12.4) — enforcement, not prompts |
 | Prompt injection | Web pages, MCP content, repo files with adversarial text | Treat all fetched content as untrusted; explicit user approval for remote content; sandbox containment |
 | Destructive commands | `rm -rf`, `git push --force`, `curl | sh` | Permission tiers + command classification + sandbox |
 | Writes outside repo | Absolute paths, symlink escapes | Path-boundary enforcement in edit/tool layer AND sandbox |
